@@ -1,0 +1,11 @@
+{
+  "name": "在庫管理",
+  "short_name": "在庫管理",
+  "lang": "ja",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#f4f6f9",
+  "theme_color": "#172b46",
+  "description": "カテゴリー別の棚卸し・在庫管理アプリ"
+}

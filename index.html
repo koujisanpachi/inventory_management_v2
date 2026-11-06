@@ -1,0 +1,174 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+  <meta name="theme-color" content="#172b46">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="在庫管理">
+  <title>在庫管理</title>
+  <link rel="manifest" href="./manifest.webmanifest">
+  <link rel="stylesheet" href="./styles.css">
+</head>
+<body>
+  <header class="topbar">
+    <button class="brand" id="homeBtn" aria-label="ホームへ">
+      <span class="brand-mark">在</span>
+      <span><b>在庫管理</b><small>INVENTORY</small></span>
+    </button>
+    <button class="icon-btn" id="backupBtn" title="バックアップ">⇧</button>
+  </header>
+
+  <main id="app" class="app-main">
+    <section id="homeView" class="view">
+      <div class="welcome">
+        <p class="eyebrow">INVENTORY MANAGEMENT</p>
+        <h1>在庫を、シンプルに。</h1>
+        <p class="muted">カテゴリーを選択して棚卸しを始めましょう。</p>
+      </div>
+      <div class="category-grid" id="categoryGrid"></div>
+      <button class="wide-card" id="allStockBtn">
+        <span class="wide-icon">▤</span>
+        <span><b>在庫一覧</b><small>全カテゴリーの商品・在庫を確認</small></span>
+        <span class="chevron">›</span>
+      </button>
+      <div class="home-actions">
+        <button class="text-action" id="historyBtn">棚卸し履歴を見る</button>
+        <button class="text-action" id="settingsBtn">データ管理</button>
+      </div>
+    </section>
+
+    <section id="categoryView" class="view hidden">
+      <div class="page-heading">
+        <button class="back-btn" data-back>‹ 戻る</button>
+        <p class="eyebrow">CATEGORY</p>
+        <h1 id="categoryTitle">電材</h1>
+        <p class="muted" id="categorySummary"></p>
+      </div>
+      <div class="toolbar">
+        <input id="categorySearch" class="search" placeholder="品名・型番で検索" autocomplete="off">
+        <button class="primary-btn" id="addItemBtn">＋ 商品登録</button>
+      </div>
+      <div class="section-row"><b>商品一覧</b><span class="muted" id="categoryCount"></span></div>
+      <div id="categoryItems" class="item-list"></div>
+      <button class="bottom-primary" id="startStocktakeBtn">このカテゴリーの棚卸しを始める</button>
+    </section>
+
+    <section id="stocktakeView" class="view hidden">
+      <div class="page-heading">
+        <button class="back-btn" data-back>‹ 戻る</button>
+        <p class="eyebrow">STOCKTAKE</p>
+        <h1 id="stocktakeTitle">棚卸し</h1>
+        <p class="muted">実際に数えた数量を入力してください。</p>
+      </div>
+      <div class="stocktake-summary" id="stocktakeSummary"></div>
+      <div id="stocktakeItems" class="item-list"></div>
+      <div class="sticky-footer">
+        <button class="secondary-btn" id="cancelStocktakeBtn">中止</button>
+        <button class="primary-btn grow" id="confirmStocktakeBtn">棚卸しを確定</button>
+      </div>
+    </section>
+
+    <section id="allStockView" class="view hidden">
+      <div class="page-heading">
+        <button class="back-btn" data-back>‹ 戻る</button>
+        <p class="eyebrow">ALL INVENTORY</p>
+        <h1>在庫一覧</h1>
+        <p class="muted">全カテゴリーの在庫をまとめて確認できます。</p>
+      </div>
+      <div class="toolbar stacked">
+        <input id="allSearch" class="search" placeholder="品名・型番・メーカーで検索">
+        <div class="toolbar-line">
+          <select id="allCategoryFilter" class="select"><option value="">すべてのカテゴリー</option></select>
+          <button class="secondary-btn" id="csvBtn">CSV出力</button>
+        </div>
+      </div>
+      <div class="section-row"><b>登録商品</b><span class="muted" id="allCount"></span></div>
+      <div id="allItems" class="item-list"></div>
+    </section>
+
+    <section id="historyView" class="view hidden">
+      <div class="page-heading">
+        <button class="back-btn" data-back>‹ 戻る</button>
+        <p class="eyebrow">HISTORY</p>
+        <h1>棚卸し履歴</h1>
+        <p class="muted">確定した棚卸しの記録です。</p>
+      </div>
+      <div id="historyList" class="history-list"></div>
+    </section>
+
+    <section id="settingsView" class="view hidden">
+      <div class="page-heading">
+        <button class="back-btn" data-back>‹ 戻る</button>
+        <p class="eyebrow">DATA MANAGEMENT</p>
+        <h1>データ管理</h1>
+        <p class="muted">データはこのiPhoneのブラウザ内に保存されます。</p>
+      </div>
+      <div class="settings-card">
+        <div class="settings-card-head"><b>カテゴリー管理</b><button class="secondary-btn" id="addCategoryBtn">＋ 追加</button></div>
+        <p>カテゴリーの追加・名称変更・アイコン変更ができます。</p>
+        <div id="categorySettingsList" class="category-settings-list"></div>
+      </div>
+      <div class="settings-card">
+        <b>バックアップ</b>
+        <p>商品・在庫・棚卸し履歴をJSONファイルに保存します。機種変更やデータ復元に利用できます。</p>
+        <button class="primary-btn full" id="exportBackupBtn">バックアップを書き出す</button>
+      </div>
+      <div class="settings-card">
+        <b>バックアップから復元</b>
+        <p>以前に書き出したJSONバックアップを読み込みます。現在のデータは上書きされます。</p>
+        <label class="file-label">バックアップを選択<input type="file" id="importBackupInput" accept=".json,application/json"></label>
+      </div>
+      <div class="settings-card">
+        <b>CSV出力</b>
+        <p>全商品の在庫一覧を、1商品につき1行で出力します。</p>
+        <button class="secondary-btn full" id="settingsCsvBtn">在庫CSVを書き出す</button>
+      </div>
+      <div class="settings-note"><b>ご注意</b><br>ブラウザのサイトデータ削除や端末故障に備えて、定期的にバックアップしてください。アプリのURLが同じでも、別の端末とはデータ共有されません。</div>
+    </section>
+  </main>
+
+  <dialog id="itemDialog" class="dialog">
+    <form id="itemForm" method="dialog">
+      <div class="dialog-head"><h2 id="itemDialogTitle">商品登録</h2><button type="button" class="close-btn" id="closeItemDialog">×</button></div>
+      <input type="hidden" id="editId">
+      <label>カテゴリー<select id="itemCategory" required></select></label>
+      <label>品名<input id="itemName" required maxlength="100" placeholder="例：電磁弁"></label>
+      <label>型番<input id="itemModel" maxlength="100" placeholder="例：EVR10"></label>
+      <label>メーカー<input id="itemMaker" maxlength="100" placeholder="例：Danfoss"></label>
+      <div class="form-row">
+        <label>在庫数<input id="itemQty" type="number" min="0" step="any" value="0" required></label>
+        <label>単位<input id="itemUnit" maxlength="20" placeholder="個" value="個"></label>
+      </div>
+      <label>保管場所<input id="itemLocation" maxlength="100" placeholder="例：倉庫A"></label>
+      <label>備考<textarea id="itemNote" rows="2" maxlength="500"></textarea></label>
+      <button class="primary-btn full" type="submit">保存する</button>
+    </form>
+  </dialog>
+
+  <dialog id="categoryDialog" class="dialog">
+    <form id="categoryForm" method="dialog">
+      <div class="dialog-head"><h2 id="categoryDialogTitle">カテゴリー追加</h2><button type="button" class="close-btn" id="closeCategoryDialog">×</button></div>
+      <input type="hidden" id="categoryEditId">
+      <label>カテゴリー名<input id="categoryNameInput" required maxlength="30" placeholder="例：工具"></label>
+      <label>説明<input id="categoryDescInput" maxlength="60" placeholder="例：工具・作業用品"></label>
+      <label>アイコン<select id="categoryIconInput"></select></label>
+      <div class="icon-preview" id="categoryIconPreview">🔌</div>
+      <button class="primary-btn full" type="submit">保存する</button>
+    </form>
+  </dialog>
+
+  <dialog id="detailDialog" class="dialog">
+    <div class="dialog-head"><h2>商品詳細</h2><button class="close-btn" id="closeDetailDialog">×</button></div>
+    <div id="detailContent"></div>
+    <div class="dialog-actions">
+      <button class="secondary-btn" id="detailEditBtn">編集</button>
+      <button class="danger-btn" id="detailDeleteBtn">削除</button>
+    </div>
+  </dialog>
+
+  <div id="toast" class="toast" role="status"></div>
+  <script src="./app.js"></script>
+</body>
+</html>
