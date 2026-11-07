@@ -31,3 +31,5 @@ button,input,select,textarea{font:inherit}button{cursor:pointer}.topbar{height:6
 .danger-mini{color:var(--red)}
 .icon-preview{width:54px;height:54px;display:grid;place-items:center;background:#eaf0f7;border-radius:13px;font-size:29px;margin:0 auto 4px}
 #categoryIconInput{font-size:20px}
+
+.brand-mark{display:block;object-fit:cover;border:1px solid #8295ad;border-radius:9px;overflow:hidden}
