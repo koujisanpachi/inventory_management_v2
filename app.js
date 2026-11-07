@@ -1,58 +1,53 @@
 (() => {
   "use strict";
-  const DB_NAME = "inventory-local-db";
-  const DB_VERSION = 2;
   const DEFAULT_CATEGORIES = [
-    {id:"electrical",name:"電材",icon:"🔌",desc:"電気・配線関連部材"},
-    {id:"water",name:"水部材",icon:"🔧",desc:"配管・バルブ関連部材"},
-    {id:"refrigeration",name:"冷凍部材",icon:"❄️",desc:"冷媒・冷凍機関連部材"},
-    {id:"other",name:"その他",icon:"📦",desc:"その他の備品・消耗品"}
+    {id:"electrical",name:"電材",icon:"🔌",desc:"電気・配線関連部材",order:0},
+    {id:"water",name:"水部材",icon:"🔧",desc:"配管・バルブ関連部材",order:1},
+    {id:"refrigeration",name:"冷凍部材",icon:"❄️",desc:"冷媒・冷凍機関連部材",order:2},
+    {id:"other",name:"その他",icon:"📦",desc:"その他の備品・消耗品",order:3}
   ];
   const ICON_OPTIONS = ["🔌","🔧","🪛","🔩","🧰","⚡","❄️","🧊","🚰","🪠","🧪","📦","🛠️","💡","🔋","🧯","🚿","⚙️","📏","🪜","🧲","🧵","🪚","🗜️"];
   let CATEGORIES = [...DEFAULT_CATEGORIES];
   let db, currentCategory = null, selectedItemId = null, stocktake = null;
+  let currentUser = null;
   const $ = id => document.getElementById(id);
   const now = () => new Date().toISOString();
   const uid = () => (crypto.randomUUID ? crypto.randomUUID() : "id-"+Date.now()+"-"+Math.random().toString(16).slice(2));
   const categoryName = id => CATEGORIES.find(c=>c.id===id)?.name || "その他";
   const escapeHtml = value => String(value ?? "").replace(/[&<>"']/g, c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
-  function openDB(){
-    return new Promise((resolve,reject)=>{
-      const req=indexedDB.open(DB_NAME,DB_VERSION);
-      req.onupgradeneeded=()=>{
-        const d=req.result;
-        if(!d.objectStoreNames.contains("items")){const s=d.createObjectStore("items",{keyPath:"id"});s.createIndex("categoryId","categoryId");}
-        if(!d.objectStoreNames.contains("history")){const s=d.createObjectStore("history",{keyPath:"id"});s.createIndex("date","date");}
-        if(!d.objectStoreNames.contains("categories"))d.createObjectStore("categories",{keyPath:"id"});
-      };
-      req.onsuccess=async()=>{
-        const opened=req.result;
-        try {
-          const tx=opened.transaction("categories","readonly");
-          const reqAll=tx.objectStore("categories").getAll();
-          reqAll.onsuccess=async()=>{
-            if(reqAll.result.length){CATEGORIES=reqAll.result.sort((a,b)=>(a.order??0)-(b.order??0));}
-            else {
-              CATEGORIES=[...DEFAULT_CATEGORIES];
-              const seed=opened.transaction("categories","readwrite");
-              CATEGORIES.forEach(c=>seed.objectStore("categories").put(c));
-              seed.oncomplete=()=>resolve(opened);seed.onerror=()=>reject(seed.error);
-              return;
-            }
-            resolve(opened);
-          };
-          reqAll.onerror=()=>reject(reqAll.error);
-        } catch(err){reject(err)}
-      };
-      req.onerror=()=>reject(req.error);
-    });
+  const collection = name => db.collection(name);
+  async function getAll(name){const snap=await collection(name).get();return snap.docs.map(d=>d.data())}
+  async function getOne(name,id){const doc=await collection(name).doc(String(id)).get();return doc.exists?doc.data():undefined}
+  async function put(name,obj){await collection(name).doc(String(obj.id)).set({...obj,updatedBy:currentUser?.name||"不明",updatedByPin:currentUser?.pin||""},{merge:true});return obj.id}
+  async function del(name,id){await collection(name).doc(String(id)).delete()}
+  async function clear(name){const snap=await collection(name).get();let batch=db.batch();let count=0;for(const d of snap.docs){batch.delete(d.ref);count++;if(count===400){await batch.commit();batch=db.batch();count=0}}if(count)await batch.commit()}
+  async function loadCategories(){
+    const rows=await getAll("categories");
+    if(rows.length)CATEGORIES=rows.sort((a,b)=>(a.order??0)-(b.order??0));
+    else {CATEGORIES=[...DEFAULT_CATEGORIES];for(const c of CATEGORIES)await collection("categories").doc(c.id).set(c)}
   }
-  function store(name,mode="readonly"){return db.transaction(name,mode).objectStore(name)}
-  function getAll(name){return new Promise((resolve,reject)=>{const r=store(name).getAll();r.onsuccess=()=>resolve(r.result);r.onerror=()=>reject(r.error)})}
-  function getOne(name,id){return new Promise((resolve,reject)=>{const r=store(name).get(id);r.onsuccess=()=>resolve(r.result);r.onerror=()=>reject(r.error)})}
-  function put(name,obj){return new Promise((resolve,reject)=>{const r=store(name,"readwrite").put(obj);r.onsuccess=()=>resolve(r.result);r.onerror=()=>reject(r.error)})}
-  function del(name,id){return new Promise((resolve,reject)=>{const r=store(name,"readwrite").delete(id);r.onsuccess=()=>resolve();r.onerror=()=>reject(r.error)})}
-  function clear(name){return new Promise((resolve,reject)=>{const r=store(name,"readwrite").clear();r.onsuccess=()=>resolve();r.onerror=()=>reject(r.error)})}
+  function setLoginMessage(msg){$("loginMessage").textContent=msg}
+  function showLogin(error=""){ $("loginView").classList.remove("hidden");$("userStrip").classList.add("hidden");$("app").classList.add("hidden");$("loginError").textContent=error; }
+  function showPinPanel(){ $("pinPanel").classList.remove("hidden");$("googleLoginBtn").classList.add("hidden");setLoginMessage("Google認証済みです。自分のPINを入力してください。");$("pinInput").focus(); }
+  async function startGoogleLogin(){
+    try{const provider=new firebase.auth.GoogleAuthProvider();await firebase.auth().signInWithRedirect(provider)}
+    catch(e){showLogin("Googleログインに失敗しました："+e.message)}
+  }
+  async function verifyPin(){
+    const pin=$("pinInput").value.trim();
+    const match=(window.INVENTORY_USERS||[]).find(u=>u.pin===pin);
+    if(!match){$("loginError").textContent="PINが一致しません。4桁を確認してください。";return}
+    currentUser={name:match.name,pin:match.pin};
+    sessionStorage.setItem("inventoryUser",JSON.stringify(currentUser));
+    await enterApp();
+  }
+  async function enterApp(){
+    $("loginView").classList.add("hidden");$("userStrip").classList.remove("hidden");$("app").classList.remove("hidden");
+    $("currentUserLabel").textContent=currentUser.name;
+    db=firebase.firestore();
+    await loadCategories();setup();refreshCategorySelectors();renderHome();
+    if("serviceWorker" in navigator && location.protocol!=="file:"){navigator.serviceWorker.register("./sw.js").catch(()=>{});}
+  }
   function toast(message){const t=$("toast");t.textContent=message;t.classList.add("show");setTimeout(()=>t.classList.remove("show"),2300)}
   function showView(id){document.querySelectorAll(".view").forEach(v=>v.classList.add("hidden"));$(id).classList.remove("hidden");window.scrollTo(0,0)}
   function goHome(){currentCategory=null;showView("homeView");renderHome()}
@@ -275,8 +270,22 @@
     $("importBackupInput").addEventListener("change",e=>importBackup(e.target.files[0]));
   }
   async function init(){
-    try{db=await openDB();setup();renderHome();if("serviceWorker" in navigator && location.protocol!=="file:"){navigator.serviceWorker.register("./sw.js").catch(()=>{});}}
-    catch(e){document.body.innerHTML='<main style="padding:24px">このブラウザではローカルデータベースを利用できません。SafariまたはChromeの最新版で開いてください。</main>';console.error(e)}
+    try{
+      if(!window.FIREBASE_CONFIG||String(window.FIREBASE_CONFIG.apiKey).startsWith("ここに"))throw new Error("firebase-config.js のFirebase設定が未入力です。");
+      if(!firebase.apps.length)firebase.initializeApp(window.FIREBASE_CONFIG);
+      $("googleLoginBtn").addEventListener("click",startGoogleLogin);
+      $("pinLoginBtn").addEventListener("click",verifyPin);
+      $("pinInput").addEventListener("keydown",e=>{if(e.key==="Enter")verifyPin()});
+      $("switchUserBtn").addEventListener("click",()=>{sessionStorage.removeItem("inventoryUser");currentUser=null;showLogin();showPinPanel()});
+      const result=await firebase.auth().getRedirectResult();
+      const user=firebase.auth().currentUser;
+      if(user){
+        const saved=sessionStorage.getItem("inventoryUser");
+        if(saved){try{currentUser=JSON.parse(saved);await enterApp();return}catch(e){}}
+        showPinPanel();
+      }else{showLogin();$("googleLoginBtn").classList.remove("hidden");}
+      firebase.auth().onAuthStateChanged(u=>{if(!u)showLogin()});
+    }catch(e){showLogin(e.message);console.error(e)}
   }
   init();
 })();

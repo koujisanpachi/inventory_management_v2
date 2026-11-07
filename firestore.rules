@@ -1,0 +1,11 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // 共有Googleアカウントで認証された利用者のみ読み書き可能。
+    // PINはクライアント側の簡易識別であり、Security Rules上の個人認証ではありません。
+    function signedIn() { return request.auth != null; }
+    match /items/{id} { allow read, write: if signedIn(); }
+    match /categories/{id} { allow read, write: if signedIn(); }
+    match /history/{id} { allow read, write: if signedIn(); }
+  }
+}

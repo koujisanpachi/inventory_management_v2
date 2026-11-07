@@ -14,6 +14,26 @@
   <link rel="stylesheet" href="./styles.css">
 </head>
 <body>
+
+  <section id="loginView" class="login-screen">
+    <div class="login-card">
+      <div class="login-mark">📦</div>
+      <p class="eyebrow">INVENTORY MANAGEMENT</p>
+      <h1>在庫管理</h1>
+      <p id="loginMessage" class="muted">共有在庫に接続しています。</p>
+      <button id="googleLoginBtn" class="primary-btn full">Googleアカウントでログイン</button>
+      <div id="pinPanel" class="pin-panel hidden">
+        <label>あなたのPIN（携帯番号の下4桁）<input id="pinInput" type="password" inputmode="numeric" maxlength="4" pattern="[0-9]{4}" placeholder="下4桁"></label>
+        <button id="pinLoginBtn" class="primary-btn full">在庫管理を開く</button>
+      </div>
+      <p id="loginError" class="login-error" role="alert"></p>
+    </div>
+  </section>
+  <div id="userStrip" class="user-strip hidden">
+    <span>利用者：<b id="currentUserLabel"></b></span>
+    <button id="switchUserBtn" class="text-action">利用者を変更</button>
+  </div>
+
   <header class="topbar">
     <button class="brand" id="homeBtn" aria-label="ホームへ">
       <img class="brand-mark" src="./icon-192.png" alt="">
@@ -171,6 +191,10 @@
   </dialog>
 
   <div id="toast" class="toast" role="status"></div>
+  <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-auth-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore-compat.js"></script>
+  <script src="./firebase-config.js"></script>
   <script src="./app.js"></script>
 </body>
 </html>

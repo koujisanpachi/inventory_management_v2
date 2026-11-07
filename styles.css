@@ -33,3 +33,14 @@ button,input,select,textarea{font:inherit}button{cursor:pointer}.topbar{height:6
 #categoryIconInput{font-size:20px}
 
 .brand-mark{display:block;object-fit:cover;border:1px solid #8295ad;border-radius:9px;overflow:hidden}
+
+.login-screen{position:fixed;inset:0;z-index:50;background:var(--bg);display:grid;place-items:center;padding:22px}
+.login-card{width:min(100%,420px);background:white;border:1px solid var(--line);border-radius:18px;padding:26px 22px;box-shadow:0 8px 30px #142a4412}
+.login-card h1{color:var(--navy);margin:4px 0 8px;font-size:27px}
+.login-mark{font-size:36px;margin-bottom:12px}
+.pin-panel{margin-top:18px;padding-top:16px;border-top:1px solid var(--line)}
+.pin-panel label{display:block;font-size:13px;font-weight:700;color:#53657a}
+.pin-panel input{margin-top:7px;letter-spacing:.35em;font-size:22px;text-align:center}
+.login-error{color:var(--red);font-size:12px;line-height:1.5;min-height:18px;margin:10px 0 0}
+.user-strip{max-width:760px;margin:0 auto;padding:7px 16px;background:#eaf0f7;color:var(--navy);font-size:12px;display:flex;justify-content:space-between;align-items:center}
+.user-strip .text-action{margin:0;padding:3px 0}
