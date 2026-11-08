@@ -55,19 +55,29 @@
       "auth/network-request-failed":"通信に失敗しました。通信環境を確認して、もう一度お試しください。",
       "auth/web-storage-unsupported":"このブラウザでは認証情報を保存できません。通常のブラウザ画面で開いてください。",
       "auth/redirect-cancelled-by-user":"Googleログインがキャンセルされました。",
-      "auth/redirect-operation-pending":"Googleログイン処理がすでに進行中です。画面を再読み込みしてください。"
+      "auth/redirect-operation-pending":"Googleログイン処理がすでに進行中です。画面を再読み込みしてください。",
+      "auth/popup-blocked":"ブラウザがログイン画面をブロックしました。ポップアップを許可して再試行してください。",
+      "auth/popup-closed-by-user":"Googleログイン画面が閉じられました。もう一度お試しください。",
+      "auth/cancelled-popup-request":"別のログイン画面がすでに開いています。"
     };
     return messages[error?.code] || (error?.message || "原因不明の認証エラーです。");
   }
   async function startGoogleLogin(){
     try{
       const auth=firebase.auth();
-      await auth.setPersistence(firebase.auth.Auth.Persistence.LOCAL);
       const provider=new firebase.auth.GoogleAuthProvider();
       provider.setCustomParameters({prompt:"select_account"});
-      await auth.signInWithRedirect(provider);
+      // iOS Chrome/SafariではGitHub Pagesとfirebaseapp.com間の
+      // リダイレクト認証がストレージ制限の影響を受けることがあるため、
+      // ユーザー操作中にポップアップ認証を開始する。
+      const result=await auth.signInWithPopup(provider);
+      if(result && result.user){
+        showPinPanel();
+      }else{
+        showLogin("Google認証の結果を確認できませんでした。もう一度お試しください。");
+      }
     }catch(e){
-      console.error("Google sign-in failed",e);
+      console.error("Google sign-in popup failed",e);
       showLogin("Googleログインに失敗しました："+authErrorMessage(e));
     }
   }
@@ -336,23 +346,10 @@
         if(auth.currentUser)showPinPanel();else showLogin();
       });
 
-      // iOS Chrome/Safariでは認証状態の復元に時間がかかる場合があるため、
-      // getRedirectResultの完了前に未ログイン画面へ戻さない。
+      // 認証状態の保存方式を初期化してから、Firebaseの状態監視を開始する。
+      // ログイン操作自体はクリックイベント内でsignInWithPopupを直接呼び出す。
       await auth.setPersistence(firebase.auth.Auth.Persistence.LOCAL);
-      let redirectResult=null;
-      let redirectError=null;
-      try{redirectResult=await auth.getRedirectResult()}catch(e){redirectError=e;console.error("Redirect result error",e)}
-
-      const authenticatedUser=(redirectResult&&redirectResult.user)||auth.currentUser;
-      if(authenticatedUser){
-        const saved=sessionStorage.getItem("inventoryUser");
-        if(saved){
-          try{currentUser=JSON.parse(saved);await enterApp()}
-          catch(e){console.error("Saved user restore failed",e);sessionStorage.removeItem("inventoryUser");showPinPanel()}
-        }else{showPinPanel()}
-      }else{
-        showLogin(redirectError?"Google認証を完了できませんでした："+authErrorMessage(redirectError):"");
-      }
+      showLogin();
 
       // 初回の認証状態確定後も監視し、復帰・ログアウトを画面へ反映する。
       auth.onAuthStateChanged(async user=>{
