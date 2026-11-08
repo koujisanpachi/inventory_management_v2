@@ -44,3 +44,8 @@ button,input,select,textarea{font:inherit}button{cursor:pointer}.topbar{height:6
 .login-error{color:var(--red);font-size:12px;line-height:1.5;min-height:18px;margin:10px 0 0}
 .user-strip{max-width:760px;margin:0 auto;padding:7px 16px;background:#eaf0f7;color:var(--navy);font-size:12px;display:flex;justify-content:space-between;align-items:center}
 .user-strip .text-action{margin:0;padding:3px 0}
+
+.category-order-controls{display:flex;flex-direction:column;gap:3px;flex:0 0 auto}
+.order-btn{min-width:30px;padding:3px 6px;font-size:12px;line-height:1.2}
+.order-btn:disabled{opacity:.3;cursor:default}
+@media(max-width:390px){.category-setting-row{gap:6px;padding:7px}.category-setting-row .mini-btn{padding:6px 7px;font-size:10px}.order-btn{min-width:26px;padding:3px 5px}}

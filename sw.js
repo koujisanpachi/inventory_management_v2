@@ -1,4 +1,4 @@
-const CACHE = "inventory-app-firebase-popupfix-iossafe-v4";
+const CACHE = "inventory-app-firebase-category-order-v5";
 const ASSETS = [
   "./", "./index.html", "./styles.css", "./app.js", "./firebase-config.js",
   "./manifest.webmanifest", "./icon-192.png", "./icon-512.png",

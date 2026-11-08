@@ -262,9 +262,32 @@
     if(CATEGORIES.some(c=>c.id===itemOld))$("itemCategory").value=itemOld;
   }
   function renderCategorySettings(){
-    $("categorySettingsList").innerHTML=CATEGORIES.map(c=>`<div class="category-setting-row"><span class="cat-icon">${escapeHtml(c.icon)}</span><span class="category-setting-name"><b>${escapeHtml(c.name)}</b><small>${escapeHtml(c.desc||"")}</small></span><button class="mini-btn" data-edit-category="${escapeHtml(c.id)}">編集</button><button class="mini-btn danger-mini" data-delete-category="${escapeHtml(c.id)}">削除</button></div>`).join("");
+    $("categorySettingsList").innerHTML=CATEGORIES.map((c,index)=>`<div class="category-setting-row"><span class="cat-icon">${escapeHtml(c.icon)}</span><span class="category-setting-name"><b>${escapeHtml(c.name)}</b><small>${escapeHtml(c.desc||"")}</small></span><div class="category-order-controls"><button class="mini-btn order-btn" data-move-category="${escapeHtml(c.id)}" data-direction="-1" aria-label="${escapeHtml(c.name)}を上へ" ${index===0?"disabled":""}>↑</button><button class="mini-btn order-btn" data-move-category="${escapeHtml(c.id)}" data-direction="1" aria-label="${escapeHtml(c.name)}を下へ" ${index===CATEGORIES.length-1?"disabled":""}>↓</button></div><button class="mini-btn" data-edit-category="${escapeHtml(c.id)}">編集</button><button class="mini-btn danger-mini" data-delete-category="${escapeHtml(c.id)}">削除</button></div>`).join("");
     $("categorySettingsList").querySelectorAll("[data-edit-category]").forEach(b=>b.addEventListener("click",()=>openCategoryDialog(CATEGORIES.find(c=>c.id===b.dataset.editCategory))));
     $("categorySettingsList").querySelectorAll("[data-delete-category]").forEach(b=>b.addEventListener("click",()=>deleteCategory(b.dataset.deleteCategory)));
+    $("categorySettingsList").querySelectorAll("[data-move-category]").forEach(b=>b.addEventListener("click",()=>moveCategory(b.dataset.moveCategory,Number(b.dataset.direction))));
+  }
+  async function moveCategory(id,direction){
+    const index=CATEGORIES.findIndex(c=>c.id===id);
+    const target=index+direction;
+    if(index<0||target<0||target>=CATEGORIES.length)return;
+    const previous=CATEGORIES.map(c=>({...c}));
+    [CATEGORIES[index],CATEGORIES[target]]=[CATEGORIES[target],CATEGORIES[index]];
+    CATEGORIES=CATEGORIES.map((c,i)=>({...c,order:i}));
+    renderCategorySettings();
+    refreshCategorySelectors();
+    renderHome();
+    try{
+      await Promise.all(CATEGORIES.map(c=>put("categories",c)));
+      toast("カテゴリーの順番を変更しました");
+    }catch(error){
+      console.error("Category order update failed",error);
+      CATEGORIES=previous;
+      renderCategorySettings();
+      refreshCategorySelectors();
+      renderHome();
+      toast("順番の保存に失敗しました。通信状態を確認してください");
+    }
   }
   function openCategoryDialog(category=null){
     $("categoryForm").reset();
