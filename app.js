@@ -10,6 +10,8 @@
   let CATEGORIES = [...DEFAULT_CATEGORIES];
   let db, currentCategory = null, selectedItemId = null, stocktake = null;
   let currentUser = null;
+  let appStarted = false;
+  let appStarting = false;
   const $ = id => document.getElementById(id);
   const now = () => new Date().toISOString();
   const uid = () => (crypto.randomUUID ? crypto.randomUUID() : "id-"+Date.now()+"-"+Math.random().toString(16).slice(2));
@@ -27,26 +29,74 @@
     else {CATEGORIES=[...DEFAULT_CATEGORIES];for(const c of CATEGORIES)await collection("categories").doc(c.id).set(c)}
   }
   function setLoginMessage(msg){$("loginMessage").textContent=msg}
-  function showLogin(error=""){ $("loginView").classList.remove("hidden");$("userStrip").classList.add("hidden");$("app").classList.add("hidden");$("loginError").textContent=error; }
-  function showPinPanel(){ $("pinPanel").classList.remove("hidden");$("googleLoginBtn").classList.add("hidden");setLoginMessage("Google認証済みです。自分のPINを入力してください。");$("pinInput").focus(); }
+  function showLogin(error=""){
+    $("loginView").classList.remove("hidden");
+    $("userStrip").classList.add("hidden");
+    $("app").classList.add("hidden");
+    $("pinPanel").classList.add("hidden");
+    $("googleLoginBtn").classList.remove("hidden");
+    $("loginError").textContent=error;
+    setLoginMessage("共有在庫に接続しています。");
+  }
+  function showPinPanel(){
+    $("loginView").classList.remove("hidden");
+    $("userStrip").classList.add("hidden");
+    $("app").classList.add("hidden");
+    $("pinPanel").classList.remove("hidden");
+    $("googleLoginBtn").classList.add("hidden");
+    $("loginError").textContent="";
+    setLoginMessage("Google認証済みです。自分のPINを入力してください。");
+    $("pinInput").focus();
+  }
+  function authErrorMessage(error){
+    const messages={
+      "auth/unauthorized-domain":"このサイトのドメインがFirebaseで承認されていません。Authorized domainsを確認してください。",
+      "auth/operation-not-allowed":"FirebaseでGoogleログインが有効になっていません。",
+      "auth/network-request-failed":"通信に失敗しました。通信環境を確認して、もう一度お試しください。",
+      "auth/web-storage-unsupported":"このブラウザでは認証情報を保存できません。通常のブラウザ画面で開いてください。",
+      "auth/redirect-cancelled-by-user":"Googleログインがキャンセルされました。",
+      "auth/redirect-operation-pending":"Googleログイン処理がすでに進行中です。画面を再読み込みしてください。"
+    };
+    return messages[error?.code] || (error?.message || "原因不明の認証エラーです。");
+  }
   async function startGoogleLogin(){
-    try{const provider=new firebase.auth.GoogleAuthProvider();await firebase.auth().signInWithRedirect(provider)}
-    catch(e){showLogin("Googleログインに失敗しました："+e.message)}
+    try{
+      const auth=firebase.auth();
+      await auth.setPersistence(firebase.auth.Auth.Persistence.LOCAL);
+      const provider=new firebase.auth.GoogleAuthProvider();
+      provider.setCustomParameters({prompt:"select_account"});
+      await auth.signInWithRedirect(provider);
+    }catch(e){
+      console.error("Google sign-in failed",e);
+      showLogin("Googleログインに失敗しました："+authErrorMessage(e));
+    }
   }
   async function verifyPin(){
+    if(!firebase.auth().currentUser){showLogin("Google認証が切れています。もう一度ログインしてください。");return}
     const pin=$("pinInput").value.trim();
     const match=(window.INVENTORY_USERS||[]).find(u=>u.pin===pin);
     if(!match){$("loginError").textContent="PINが一致しません。4桁を確認してください。";return}
     currentUser={name:match.name,pin:match.pin};
     sessionStorage.setItem("inventoryUser",JSON.stringify(currentUser));
-    await enterApp();
+    try{await enterApp()}catch(e){console.error(e);$("loginError").textContent="在庫データの読み込みに失敗しました："+e.message}
   }
   async function enterApp(){
-    $("loginView").classList.add("hidden");$("userStrip").classList.remove("hidden");$("app").classList.remove("hidden");
-    $("currentUserLabel").textContent=currentUser.name;
-    db=firebase.firestore();
-    await loadCategories();setup();refreshCategorySelectors();renderHome();
-    if("serviceWorker" in navigator && location.protocol!=="file:"){navigator.serviceWorker.register("./sw.js").catch(()=>{});}
+    // すでに初期化済みなら、利用者名だけ切り替えて画面を戻す。
+    if(appStarted){
+      $("currentUserLabel").textContent=currentUser.name;
+      $("loginView").classList.add("hidden");$("userStrip").classList.remove("hidden");$("app").classList.remove("hidden");
+      return;
+    }
+    if(appStarting)return;
+    appStarting=true;
+    try{
+      db=firebase.firestore();
+      await loadCategories();
+      setup();refreshCategorySelectors();renderHome();
+      $("currentUserLabel").textContent=currentUser.name;
+      $("loginView").classList.add("hidden");$("userStrip").classList.remove("hidden");$("app").classList.remove("hidden");
+      appStarted=true;
+    }finally{appStarting=false}
   }
   function toast(message){const t=$("toast");t.textContent=message;t.classList.add("show");setTimeout(()=>t.classList.remove("show"),2300)}
   function showView(id){document.querySelectorAll(".view").forEach(v=>v.classList.add("hidden"));$(id).classList.remove("hidden");window.scrollTo(0,0)}
@@ -270,21 +320,56 @@
     $("importBackupInput").addEventListener("change",e=>importBackup(e.target.files[0]));
   }
   async function init(){
+    // ログイン画面の段階でもService Workerを更新し、古い認証コードの残留を防ぐ。
+    if("serviceWorker" in navigator && location.protocol!=="file:"){
+      navigator.serviceWorker.register("./sw.js").catch(e=>console.warn("Service Worker registration failed",e));
+    }
     try{
       if(!window.FIREBASE_CONFIG||String(window.FIREBASE_CONFIG.apiKey).startsWith("ここに"))throw new Error("firebase-config.js のFirebase設定が未入力です。");
       if(!firebase.apps.length)firebase.initializeApp(window.FIREBASE_CONFIG);
+      const auth=firebase.auth();
       $("googleLoginBtn").addEventListener("click",startGoogleLogin);
       $("pinLoginBtn").addEventListener("click",verifyPin);
       $("pinInput").addEventListener("keydown",e=>{if(e.key==="Enter")verifyPin()});
-      $("switchUserBtn").addEventListener("click",()=>{sessionStorage.removeItem("inventoryUser");currentUser=null;showLogin();showPinPanel()});
-      const result=await firebase.auth().getRedirectResult();
-      const user=firebase.auth().currentUser;
-      if(user){
+      $("switchUserBtn").addEventListener("click",()=>{
+        sessionStorage.removeItem("inventoryUser");currentUser=null;
+        if(auth.currentUser)showPinPanel();else showLogin();
+      });
+
+      // iOS Chrome/Safariでは認証状態の復元に時間がかかる場合があるため、
+      // getRedirectResultの完了前に未ログイン画面へ戻さない。
+      await auth.setPersistence(firebase.auth.Auth.Persistence.LOCAL);
+      let redirectResult=null;
+      let redirectError=null;
+      try{redirectResult=await auth.getRedirectResult()}catch(e){redirectError=e;console.error("Redirect result error",e)}
+
+      const authenticatedUser=(redirectResult&&redirectResult.user)||auth.currentUser;
+      if(authenticatedUser){
         const saved=sessionStorage.getItem("inventoryUser");
-        if(saved){try{currentUser=JSON.parse(saved);await enterApp();return}catch(e){}}
-        showPinPanel();
-      }else{showLogin();$("googleLoginBtn").classList.remove("hidden");}
-      firebase.auth().onAuthStateChanged(u=>{if(!u)showLogin()});
+        if(saved){
+          try{currentUser=JSON.parse(saved);await enterApp()}
+          catch(e){console.error("Saved user restore failed",e);sessionStorage.removeItem("inventoryUser");showPinPanel()}
+        }else{showPinPanel()}
+      }else{
+        showLogin(redirectError?"Google認証を完了できませんでした："+authErrorMessage(redirectError):"");
+      }
+
+      // 初回の認証状態確定後も監視し、復帰・ログアウトを画面へ反映する。
+      auth.onAuthStateChanged(async user=>{
+        if(user){
+          if(appStarted)return;
+          const saved=sessionStorage.getItem("inventoryUser");
+          if(saved){
+            try{currentUser=JSON.parse(saved);await enterApp()}
+            catch(e){console.error("App restore failed",e);sessionStorage.removeItem("inventoryUser");showPinPanel()}
+          }else{showPinPanel()}
+        }else{
+          appStarted=false;currentUser=null;sessionStorage.removeItem("inventoryUser");showLogin();
+        }
+      },error=>{
+        console.error("Auth state observer error",error);
+        showLogin("ログイン状態を確認できませんでした："+authErrorMessage(error));
+      });
     }catch(e){showLogin(e.message);console.error(e)}
   }
   init();
